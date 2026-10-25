@@ -33,6 +33,17 @@ jobs:
         run: |
           test -n "$VITE_SUPABASE_URL" || (echo "::error::VITE_SUPABASE_URL secret is missing" && exit 1)
           test -n "$VITE_SUPABASE_ANON_KEY" || (echo "::error::VITE_SUPABASE_ANON_KEY secret is missing" && exit 1)
+          case "$VITE_SUPABASE_URL" in
+            https://*.supabase.co) ;;
+            *) echo "::error::VITE_SUPABASE_URL must look like https://<project-ref>.supabase.co" && exit 1 ;;
+          esac
+          case "$VITE_SUPABASE_URL" in
+            *your-project*) echo "::error::VITE_SUPABASE_URL still uses the example placeholder" && exit 1 ;;
+          esac
+          case "$VITE_SUPABASE_ANON_KEY" in
+            eyJ*|sb_publishable_*) ;;
+            *) echo "::error::VITE_SUPABASE_ANON_KEY must be the Supabase anon public or publishable key" && exit 1 ;;
+          esac
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
