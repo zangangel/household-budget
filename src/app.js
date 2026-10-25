@@ -11,12 +11,14 @@ const state = {
   currentMember: null,
   members: [],
   transactions: [],
+  fixedTransactions: [],
   budgets: [],
   recurringTemplates: [],
   benchmarks: [],
   periodType: 'month',
   periodDate: todayMonth(),
   channel: null,
+  activeTab: 'dashboard-view',
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -51,6 +53,10 @@ function bindEvents() {
   $('#transaction-form').addEventListener('submit', saveTransaction);
   $('#transaction-form').addEventListener('change', (event) => {
     if (event.target.name === 'type') updateCategoryOptions();
+  });
+  $('#today-button').addEventListener('click', () => { $('#date').value = todayDate(); });
+  document.querySelectorAll('[data-tab]').forEach((button) => {
+    button.addEventListener('click', () => switchTab(button.dataset.tab));
   });
   $('#details-toggle').addEventListener('click', toggleDetails);
   $('#period-type').addEventListener('change', (event) => {
@@ -117,19 +123,21 @@ async function loadData() {
   await supabase.rpc('generate_due_transactions', { target_household: state.household.id });
   const { start, end, monthStart } = getPeriodRange();
 
-  const [membersResult, transactionsResult, budgetsResult, recurringResult, benchmarksResult] = await Promise.all([
+  const [membersResult, transactionsResult, fixedTransactionsResult, budgetsResult, recurringResult, benchmarksResult] = await Promise.all([
     supabase.from('household_members').select('*').eq('household_id', state.household.id).order('created_at'),
     supabase.from('transactions').select('*').eq('household_id', state.household.id).gte('transaction_date', start).lte('transaction_date', end).order('transaction_date', { ascending: false }).order('created_at', { ascending: false }),
+    supabase.from('transactions').select('*').eq('household_id', state.household.id).eq('type', 'expense').eq('cost_type', 'fixed').order('transaction_date', { ascending: false }).limit(5000),
     supabase.from('budgets').select('*').eq('household_id', state.household.id).gte('month_start', start).lte('month_start', end),
     supabase.from('recurring_templates').select('*').eq('household_id', state.household.id).order('next_due_date'),
     supabase.from('benchmark_snapshots').select('*').eq('household_size', 3).order('period_end', { ascending: false }),
   ]);
 
-  const failed = [membersResult, transactionsResult, budgetsResult, recurringResult, benchmarksResult].find((result) => result.error);
+  const failed = [membersResult, transactionsResult, fixedTransactionsResult, budgetsResult, recurringResult, benchmarksResult].find((result) => result.error);
   if (failed) throw failed.error;
 
   state.members = membersResult.data || [];
   state.transactions = transactionsResult.data || [];
+  state.fixedTransactions = fixedTransactionsResult.data || [];
   state.budgets = budgetsResult.data || [];
   state.recurringTemplates = recurringResult.data || [];
   state.benchmarks = benchmarksResult.data || [];
@@ -209,9 +217,31 @@ async function saveTransaction(event) {
 
   const button = event.submitter;
   setBusy(button, true, '저장 중…');
-  const { error } = await supabase.from('transactions').insert(payload);
+  const { data: transaction, error } = await supabase.from('transactions').insert(payload).select().single();
   setBusy(button, false, '바로 저장하기');
   if (error) return handleError(error);
+
+  if (payload.cost_type === 'fixed' && payload.type === 'expense') {
+    const startedOn = payload.transaction_date || todayDate();
+    const { data: template, error: templateError } = await supabase.from('recurring_templates').insert({
+      household_id: state.household.id,
+      type: 'expense',
+      amount,
+      category: payload.category,
+      memo: payload.memo,
+      payer_member_id: payload.payer_member_id,
+      cost_type: 'fixed',
+      day_of_month: Math.min(Number(startedOn.slice(-2)), 28),
+      started_on: startedOn,
+      next_due_date: nextMonthDate(startedOn),
+      created_by: state.user.id,
+    }).select().single();
+    if (templateError) {
+      showToast('거래는 저장됐지만 고정비 자동 등록에 실패했습니다.', 'error');
+    } else {
+      await supabase.from('transactions').update({ recurring_template_id: template.id }).eq('id', transaction.id);
+    }
+  }
 
   resetTransactionForm();
   showToast('저장했습니다. 배우자의 화면에도 반영됩니다.');
@@ -310,6 +340,7 @@ async function saveRecurringTemplate(event) {
   const formData = new FormData(event.currentTarget);
   const day = Number(formData.get('day_of_month'));
   const amount = Number(formData.get('amount'));
+  const startedOn = formData.get('started_on') || todayDate();
   if (!Number.isInteger(amount) || amount <= 0 || day < 1 || day > 28) return showToast('금액과 날짜를 확인해 주세요.', 'error');
   const { error } = await supabase.from('recurring_templates').insert({
     household_id: state.household.id,
@@ -320,7 +351,8 @@ async function saveRecurringTemplate(event) {
     payer_member_id: formData.get('payer_member_id'),
     cost_type: 'fixed',
     day_of_month: day,
-    next_due_date: nextDueDate(day),
+    started_on: startedOn,
+    next_due_date: startedOn,
     created_by: state.user.id,
   });
   if (error) return handleError(error);
@@ -405,7 +437,7 @@ function render() {
   renderBudgets(expenses, monthStart);
   renderMembers(expenses);
   renderBenchmarks(expenses);
-  renderRecurring();
+  renderFixedCosts();
   renderFamily();
 }
 
@@ -415,6 +447,7 @@ function renderFormOptions() {
   updateCategoryOptions();
   $('#budget-category').innerHTML = EXPENSE_CATEGORIES.map((category) => `<option value="${category}">${category}</option>`).join('');
   document.querySelectorAll('.expense-category-select').forEach((select) => { select.innerHTML = EXPENSE_CATEGORIES.map((category) => `<option value="${category}">${category}</option>`).join(''); });
+  if (!$('#recurring-form').elements.started_on.value) $('#recurring-form').elements.started_on.value = todayDate();
 }
 
 function updateCategoryOptions() {
@@ -471,8 +504,19 @@ function renderBenchmarks(expenses) {
   $('#benchmark-list').innerHTML = rows.length ? rows.map((row) => `<div class="metric-row"><div><strong>${escapeHtml(row.category)}</strong><span>${escapeHtml(row.source)}</span></div><div class="metric-value ${row.rate >= 120 ? 'danger' : row.rate > 100 ? 'warning' : ''}">${row.rate}%</div></div>`).join('') : '<p class="empty-inline">아직 공식 기준 데이터가 등록되지 않았습니다.</p>';
 }
 
-function renderRecurring() {
-  $('#recurring-list').innerHTML = state.recurringTemplates.length ? state.recurringTemplates.map((template) => `<div class="metric-row"><div><strong>${escapeHtml(template.memo || template.category)}</strong><span>매월 ${template.day_of_month}일 · ${escapeHtml(memberName(template.payer_member_id))}</span></div><div class="metric-value">${formatCurrency(template.amount)}</div></div>`).join('') : '<p class="empty-inline">등록된 반복비가 없습니다.</p>';
+function renderFixedCosts() {
+  const totalPaid = sum(state.fixedTransactions, 'amount');
+  $('#fixed-total-all').textContent = formatCurrency(totalPaid);
+  $('#fixed-template-count').textContent = `${state.recurringTemplates.filter((template) => template.active).length}건`;
+  const rows = state.recurringTemplates.map((template) => {
+    const paid = sum(state.fixedTransactions.filter((transaction) => transaction.recurring_template_id === template.id), 'amount');
+    return `<div class="fixed-row"><div><strong>${escapeHtml(template.memo || template.category)}</strong><span>${escapeHtml(template.category)} · ${escapeHtml(memberName(template.payer_member_id))}</span></div><div><strong>${formatCurrency(template.amount)} / 월</strong><span>시작 ${formatDate(template.started_on)} · 누계 ${formatCurrency(paid)}</span></div></div>`;
+  });
+  const unlinked = state.fixedTransactions.filter((transaction) => !transaction.recurring_template_id);
+  if (unlinked.length) {
+    rows.push(`<div class="fixed-row"><div><strong>기존 고정비 기록</strong><span>반복 템플릿과 연결되지 않은 기록</span></div><div><strong>${formatCurrency(sum(unlinked, 'amount'))}</strong><span>${unlinked.length}건</span></div></div>`);
+  }
+  $('#fixed-list').innerHTML = rows.length ? rows.join('') : '<p class="empty-inline">등록된 고정비가 없습니다.</p>';
 }
 
 function renderFamily() {
@@ -514,6 +558,17 @@ function nextDueDate(day) {
   let due = new Date(now.getFullYear(), now.getMonth(), day);
   if (due < new Date(now.getFullYear(), now.getMonth(), now.getDate())) due = new Date(now.getFullYear(), now.getMonth() + 1, day);
   return toDateString(due);
+}
+
+function nextMonthDate(dateValue) {
+  const [year, month, day] = dateValue.split('-').map(Number);
+  return toDateString(new Date(year, month, Math.min(day, 28)));
+}
+
+function switchTab(tabId) {
+  state.activeTab = tabId;
+  document.querySelectorAll('[data-tab]').forEach((button) => button.classList.toggle('is-active', button.dataset.tab === tabId));
+  document.querySelectorAll('.tab-view').forEach((view) => { view.hidden = view.id !== tabId; });
 }
 
 function showOnly(id) { ['auth-view', 'onboarding-view', 'config-view', 'app-view'].forEach((viewId) => { document.getElementById(viewId).hidden = viewId !== id; }); }

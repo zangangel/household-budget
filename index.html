@@ -86,6 +86,12 @@
         </div>
       </section>
 
+      <nav class="view-tabs" aria-label="가계부 보기">
+        <button class="view-tab is-active" type="button" data-tab="dashboard-view">대시보드</button>
+        <button class="view-tab" type="button" data-tab="fixed-view">고정비 관리</button>
+      </nav>
+
+      <div id="dashboard-view" class="tab-view">
       <section class="summary-grid" aria-label="기간별 요약">
         <article class="summary-card income-card"><span>수입</span><strong id="income-total">₩0</strong></article>
         <article class="summary-card expense-card"><span>지출</span><strong id="expense-total">₩0</strong></article>
@@ -106,7 +112,7 @@
             <label class="field"><span>금액</span><input id="amount" name="amount" type="number" min="1" step="100" inputmode="numeric" placeholder="0" required /></label>
             <div class="field-row">
               <label class="field"><span>누가 부담했나요?</span><select id="payer" name="payer_member_id" required></select></label>
-              <label class="field"><span>날짜</span><input id="date" name="transaction_date" type="date" required /></label>
+              <label class="field"><span>날짜</span><div class="date-input-row"><input id="date" name="transaction_date" type="date" required /><button id="today-button" class="today-button" type="button">오늘</button></div></label>
             </div>
             <button id="details-toggle" class="details-toggle" type="button" aria-expanded="false">상세 정보 추가 <span>＋</span></button>
             <div id="details-fields" class="details-fields" hidden>
@@ -132,11 +138,19 @@
         <article class="panel"><div class="panel-heading"><div><p class="eyebrow">BY PERSON</p><h2>누가 많이 썼나요?</h2></div></div><div id="member-list" class="metric-list"></div></article>
         <article class="panel"><div class="panel-heading"><div><p class="eyebrow">BENCHMARK</p><h2>3인 가구 평균 비교</h2></div></div><div id="benchmark-list" class="metric-list"></div><p class="helper-text">공식 기준 데이터를 등록하면 자동으로 비교합니다.</p></article>
       </section>
+      </div>
 
-      <section class="management-grid">
-        <article class="panel"><div class="panel-heading"><div><p class="eyebrow">RECURRING</p><h2>고정비 예정</h2></div></div><form id="recurring-form" class="recurring-form"><div class="field-row"><label class="field"><span>금액</span><input name="amount" type="number" min="1" step="1000" required /></label><label class="field"><span>매월 일자</span><input name="day_of_month" type="number" min="1" max="28" value="1" required /></label></div><div class="field-row"><label class="field"><span>카테고리</span><select name="category" class="expense-category-select"></select></label><label class="field"><span>부담자</span><select name="payer_member_id" class="member-select" required></select></label></div><label class="field"><span>메모</span><input name="memo" maxlength="120" placeholder="예: 월세, 보험료" /></label><button class="secondary-button" type="submit">반복비 추가</button></form><div id="recurring-list" class="metric-list"></div></article>
-        <article class="panel settings-panel"><div class="panel-heading"><div><p class="eyebrow">HOUSEHOLD</p><h2>가구 설정</h2></div></div><p class="muted">배우자에게 이 참여 코드를 공유하세요.</p><div class="join-code-row"><code id="join-code"></code><button id="copy-code-button" class="text-button" type="button">복사</button></div><form id="family-member-form" class="inline-form"><input name="memberName" placeholder="딸 이름 추가" required /><button class="secondary-button" type="submit">가족 추가</button></form><div id="family-list" class="family-list"></div></article>
-      </section>
+      <div id="fixed-view" class="tab-view" hidden>
+        <section class="fixed-overview">
+          <article class="fixed-total-card"><span>고정비 누계</span><strong id="fixed-total-all">₩0</strong><small>기록된 고정비 전체</small></article>
+          <article class="fixed-total-card"><span>활성 고정비</span><strong id="fixed-template-count">0건</strong><small>매월 자동 추가되는 항목</small></article>
+        </section>
+        <section class="management-grid">
+          <article class="panel"><div class="panel-heading"><div><p class="eyebrow">FIXED COSTS</p><h2>고정비 등록</h2></div></div><p class="muted">등록하면 시작일 기준으로 매월 자동으로 내역이 추가됩니다.</p><form id="recurring-form" class="recurring-form"><div class="field-row"><label class="field"><span>금액</span><input name="amount" type="number" min="1" step="1000" required /></label><label class="field"><span>매월 일자</span><input name="day_of_month" type="number" min="1" max="28" value="1" required /></label></div><div class="field-row"><label class="field"><span>시작일</span><input name="started_on" type="date" required /></label><label class="field"><span>부담자</span><select name="payer_member_id" class="member-select" required></select></label></div><div class="field-row"><label class="field"><span>카테고리</span><select name="category" class="expense-category-select"></select></label><label class="field"><span>고정비 항목</span><input name="memo" maxlength="120" placeholder="예: 월세, 보험료" /></label></div><button class="secondary-button" type="submit">고정비 추가</button></form></article>
+          <article class="panel settings-panel"><div class="panel-heading"><div><p class="eyebrow">HOUSEHOLD</p><h2>가구 설정</h2></div></div><p class="muted">배우자에게 이 참여 코드를 공유하세요.</p><div class="join-code-row"><code id="join-code"></code><button id="copy-code-button" class="text-button" type="button">복사</button></div><form id="family-member-form" class="inline-form"><input name="memberName" placeholder="딸 이름 추가" required /><button class="secondary-button" type="submit">가족 추가</button></form><div id="family-list" class="family-list"></div></article>
+        </section>
+        <section class="panel fixed-list-panel"><div class="panel-heading"><div><p class="eyebrow">FIXED COST HISTORY</p><h2>고정비 항목과 누계</h2></div></div><div id="fixed-list" class="fixed-list"></div></section>
+      </div>
     </main>
 
     <dialog id="edit-dialog" class="edit-dialog"><form id="edit-form" class="stack-form"><div class="panel-heading"><h2>내역 수정</h2><button id="close-edit-button" class="icon-button" type="button" aria-label="닫기">×</button></div><input name="id" type="hidden" /><label class="field"><span>금액</span><input name="amount" type="number" min="1" required /></label><div class="field-row"><label class="field"><span>날짜</span><input name="transaction_date" type="date" required /></label><label class="field"><span>카테고리</span><select name="category"></select></label></div><div class="field-row"><label class="field"><span>부담자</span><select name="payer_member_id"></select></label><label class="field"><span>고정/변동</span><select name="cost_type"><option value="variable">변동비</option><option value="fixed">고정비</option></select></label></div><label class="field"><span>메모</span><input name="memo" maxlength="120" /></label><button class="primary-button" type="submit">수정 저장</button></form></dialog>

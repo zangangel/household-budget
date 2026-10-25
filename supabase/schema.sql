@@ -63,11 +63,15 @@ create table if not exists public.recurring_templates (
   payer_member_id uuid not null references public.household_members(id) on delete restrict,
   cost_type text not null default 'fixed' check (cost_type in ('fixed', 'variable')),
   day_of_month integer not null check (day_of_month between 1 and 28),
+  started_on date not null default current_date,
   next_due_date date not null,
   active boolean not null default true,
   created_by uuid not null references auth.users(id) on delete restrict,
   created_at timestamptz not null default now()
 );
+
+alter table public.recurring_templates
+  add column if not exists started_on date not null default current_date;
 
 alter table public.transactions
   drop constraint if exists transactions_recurring_template_id_fkey;
