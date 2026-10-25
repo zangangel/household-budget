@@ -1,4 +1,4 @@
-import { hasSupabaseConfig, supabase } from './lib/supabase.js';
+import { hasSupabaseConfig, supabase, supabaseConfigError } from './lib/supabase.js';
 
 const EXPENSE_CATEGORIES = ['식비', '주거', '교통', '교육', '의료', '생활', '여가', '쇼핑', '기타'];
 const INCOME_CATEGORIES = ['급여', '부수입', '환급', '기타'];
@@ -21,19 +21,23 @@ const state = {
 
 const $ = (selector) => document.querySelector(selector);
 
-document.addEventListener('DOMContentLoaded', boot);
+document.addEventListener('DOMContentLoaded', () => boot().catch(handleBootError));
 
 async function boot() {
+  $('#boot-fallback').hidden = true;
   bindEvents();
 
-  if (!hasSupabaseConfig) {
+  if (!hasSupabaseConfig || supabaseConfigError || !supabase) {
+    if (supabaseConfigError) {
+      $('#config-view .muted').textContent = 'Supabase URL 또는 공개 anon key 형식이 올바르지 않습니다. GitHub Secrets 값을 확인한 뒤 다시 배포해 주세요.';
+    }
     showOnly('config-view');
     return;
   }
 
   showOnly('auth-view');
   const { data } = await supabase.auth.getSession();
-  await applySession(data.session);
+  await applySession(data?.session || null);
   supabase.auth.onAuthStateChange((_event, session) => {
     window.setTimeout(() => applySession(session), 0);
   });
@@ -523,6 +527,13 @@ function showToast(message, type = 'success') {
 }
 
 function handleError(error) { console.error(error); showToast(error?.message || '처리하지 못했습니다. 잠시 후 다시 시도해 주세요.', 'error'); }
+function handleBootError(error) {
+  console.error(error);
+  const fallback = $('#boot-fallback');
+  fallback.textContent = '앱을 불러오지 못했습니다. 페이지를 새로고침하거나 배포 로그를 확인해 주세요.';
+  fallback.classList.add('error');
+  fallback.hidden = false;
+}
 function setBusy(button, busy, label) { if (!button) return; button.disabled = busy; button.textContent = label; }
 function sum(items, key) { return items.reduce((total, item) => total + Number(item[key] || 0), 0); }
 function todayDate() { return toDateString(new Date()); }
