@@ -1,41 +1,48 @@
 # Household Budget
 
-개인 가계부를 위한 local-first 웹 앱입니다. 현재 버전은 브라우저의 `localStorage`에만 데이터를 저장하므로, 별도 서버나 계정 없이 바로 사용할 수 있습니다.
+Google Apps Script와 Google Sheets로 만드는 개인 가계부입니다.
 
-## 현재 MVP
+## 현재 방향
 
-- 수입·지출 내역 등록
-- 월별 수입·지출·잔액 요약
-- 카테고리와 메모 기록
-- 내역 삭제
-- 반응형 화면
+기존의 브라우저 `localStorage` MVP에서 Apps Script 웹앱으로 방향을 전환했습니다.
 
-## 실행
+- 화면: Apps Script HTML Service
+- 서버 로직: `google.script.run`으로 호출하는 Apps Script 함수
+- 데이터 저장: Google Sheets의 `Transactions` 시트
+- 접근: Google 계정 인증을 거친 개인용 웹앱
+- 배포: Apps Script Web App (`/exec`)
 
-Python 3가 설치되어 있다면:
+기존 `index.html`과 `src/`는 동작 비교와 화면 재사용을 위한 이전 프로토타입으로 보존합니다. 실제 Apps Script 구현은 다음 단계에서 추가합니다.
 
-```bash
-npm run dev
-```
+## Apps Script MVP
 
-그 다음 브라우저에서 `http://localhost:4173`을 엽니다. `npm`은 패키지 설치가 아니라 실행 명령을 편하게 제공하기 위해 사용합니다.
+1. 월 선택과 수입·지출 요약
+2. 수입·지출 내역 등록
+3. 선택한 월의 내역 조회
+4. 내역 삭제
+5. Google Sheets에서 원장 직접 확인·백업
 
-## 데이터 보관
-
-현재 데이터는 이 브라우저의 localStorage에만 저장됩니다. 브라우저 데이터 삭제, 시크릿 창 종료, 다른 기기 사용 시 데이터가 공유되지 않습니다. 금융 데이터 보호를 위해 초기 저장소는 비공개로 만들었습니다.
-
-## 다음 단계
-
-1. CSV 내보내기·가져오기
-2. 월별/카테고리별 분석
-3. 반복 지출과 예산 한도
-4. 선택적 로그인 및 동기화
-
-## 프로젝트 문서
+## 기획 문서
 
 - [데이터 스키마](docs/01-plan/schema.md)
 - [용어집](docs/01-plan/glossary.md)
 - [ERD](docs/01-plan/erd.md)
+- [Apps Script 아키텍처](docs/01-plan/apps-script-architecture.md)
 - [코딩 컨벤션](docs/01-plan/convention.md)
 - [화면 설계](docs/02-design/mockup.md)
+- [Apps Script 함수 계약](docs/02-design/apps-script-api.md)
+- [배포 계획](docs/02-design/deployment.md)
+
+## 구현 순서
+
+1. Apps Script 프로젝트와 전용 Google Sheets 생성
+2. `Transactions`, `Categories`, `Settings` 시트 초기화
+3. 서버 함수와 입력 검증 구현
+4. HTML Service 화면을 Apps Script 호출로 연결
+5. 개인 전용 Web App으로 배포
+6. 테스트 계정으로 입력·조회·삭제와 권한 확인
+
+## 데이터 보호
+
+금융 데이터가 포함되므로 저장소는 비공개로 유지합니다. Apps Script 배포 권한은 초기에는 `나만`으로 제한하고, 다른 사용자 공유가 필요해질 때 별도 권한 설계를 먼저 검토합니다.
 

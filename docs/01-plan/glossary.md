@@ -7,5 +7,8 @@
 | Expense | 가계에서 나간 금액 | 지출 |
 | Balance | 선택한 월의 수입에서 지출을 뺀 값 | 잔액 |
 | Category | 내역을 묶어 보는 분류 | 카테고리 |
-| Local-first | 서버 없이도 핵심 기능이 동작하고 기기 안에 먼저 저장하는 방식 | 내 기기에만 저장 |
+| Apps Script Web App | Google Apps Script가 제공하는 브라우저용 웹앱 | 가계부 |
+| Google Sheet | 거래 원장을 저장하는 Google 스프레드시트 | 원장 |
+| Soft delete | 행을 지우지 않고 삭제 시각을 기록해 숨기는 방식 | 삭제 |
+| Local-first prototype | 이전 버전에서 브라우저에 먼저 저장하던 실험 방식 | 이전 프로토타입 |
 
