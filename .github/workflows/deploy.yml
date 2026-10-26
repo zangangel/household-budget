@@ -1,0 +1,69 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify Supabase configuration
+        run: |
+          test -n "$VITE_SUPABASE_URL" || (echo "::error::VITE_SUPABASE_URL secret is missing" && exit 1)
+          test -n "$VITE_SUPABASE_ANON_KEY" || (echo "::error::VITE_SUPABASE_ANON_KEY secret is missing" && exit 1)
+          case "$VITE_SUPABASE_URL" in
+            https://*.supabase.co) ;;
+            *) echo "::error::VITE_SUPABASE_URL must look like https://<project-ref>.supabase.co" && exit 1 ;;
+          esac
+          case "$VITE_SUPABASE_URL" in
+            *your-project*) echo "::error::VITE_SUPABASE_URL still uses the example placeholder" && exit 1 ;;
+          esac
+          case "$VITE_SUPABASE_ANON_KEY" in
+            eyJ*|sb_publishable_*) ;;
+            *) echo "::error::VITE_SUPABASE_ANON_KEY must be the Supabase anon public or publishable key" && exit 1 ;;
+          esac
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      - name: Build
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
